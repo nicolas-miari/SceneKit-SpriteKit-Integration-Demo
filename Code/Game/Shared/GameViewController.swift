@@ -18,11 +18,7 @@ typealias ViewControllerSuperclass = UIViewController
 import SceneKit
 import SpriteKit
 
-class ViewController: ViewControllerSuperclass, OverlayViewController {
-
-    var overlayView: OverlayView? {
-        return gameView
-    }
+class ViewController: ViewControllerSuperclass, OverlayNavigationDelegate {
 
     /*
      Strong reference to prevent deallocation. In a real app, give some thought
@@ -59,12 +55,14 @@ class ViewController: ViewControllerSuperclass, OverlayViewController {
         let overlayScene = MainTitleOverlay(size: view.bounds.size)
         present(overlayScene)
     }
-}
+
 
 // MARK - OverlayNavigationDelegate
 
-extension ViewController: OverlayNavigationDelegate {
-
+    var overlayContainer: OverlayScenePresenter? {
+        return gameView
+    }
+    
     func willTransition(to scene: OverlayScene) {
         // (unused)
     }

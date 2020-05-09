@@ -7,9 +7,9 @@
 //
 
 import Foundation
-import CoreGraphics // on iOS, Foundation does not include CGFloat, CGPoint, etc.
+import CoreGraphics
 
-// MARK: - Navigatable Overlay Scene
+// MARK: - Overlay Scene
 
 protocol OverlayScene: AnyObject {
 
@@ -17,97 +17,107 @@ protocol OverlayScene: AnyObject {
 
     var alpha: CGFloat { get set }
 
-    func fadeAlpha(to: CGFloat, duration: TimeInterval, completion: @escaping (() -> Void))
+    func fadeAlpha(to value: CGFloat, duration: TimeInterval, completion: @escaping (() -> Void))
 
     func transition(to scene: OverlayScene, completion: @escaping (() -> Void))
 }
 
-// MARK: - Overlay View
+// MARK: - Overlay Scene Presenter (View)
 
-protocol OverlayView: AnyObject {
+/**
+ Accepts an instance of a type that conforms to `OverlayScene`, and presents it
+ on screen.
+ */
+protocol OverlayScenePresenter: AnyObject {
 
     var overlayScene: OverlayScene? { get set }
 }
 
-// MARK: - Overlay View Owner
-
-protocol OverlayViewController: AnyObject {
-
-    var overlayView: OverlayView? { get }
-}
-
-// MARK: - Navigation Delegate
+// MARK: - Overlay Navigation Delegate
 
 protocol OverlayNavigationDelegate: AnyObject {
 
+    var overlayContainer: OverlayScenePresenter? { get }
+
+    /**
+     A default implemetation that always retuens 0.5 is provided.
+     */
     var transitionDuration: TimeInterval { get }
 
+    /**
+     Optional: a default implementation that relies on the requirements of
+     `OverlayScene` and `OverlayScenePresenter` ios provided.
+     */
     func present(_ scene: OverlayScene)
 
+    /**
+     Optional: a default implementation that relies on the requirements of
+     `OverlayScene` and `OverlayScenePresenter` ios provided.
+    */
     func transition(to scene: OverlayScene, completion: @escaping (() -> Void))
 
+    /**
+     Optional (an empty implementation is provided). The provided default
+     implementation of `transition(to:completion:)` calls this method **before**
+     transitioning.
+     */
     func willTransition(to scene: OverlayScene)
 
+    /**
+     Optional (an empty implementation is provided). The provided default
+     implementation of `transition(to:completion:)` calls this method **after**
+     transitioning.
+    */
     func didTransition(to scene: OverlayScene)
 }
 
 // MARK: - Default Implementations
 
-extension OverlayScene {
-
-    func transition(to scene: OverlayScene, completion: @escaping (() -> Void)) {
-        navigationDelegate?.transition(to: scene, completion: completion)
-    }
-}
-
 extension OverlayNavigationDelegate {
 
     var transitionDuration: TimeInterval {
-        return 0.25
+        return 0.5
     }
-}
-
-extension OverlayNavigationDelegate where Self: OverlayViewController {
 
     func present(_ scene: OverlayScene) {
-        overlayView?.overlayScene = scene
         scene.navigationDelegate = self
+        overlayContainer?.overlayScene = scene
     }
 
     func transition(to scene: OverlayScene, completion: @escaping (() -> Void)) {
-        /*
-         [0] Notify destination scene and prepare it for fade-in:
-         */
-        willTransition(to: scene)
-        scene.alpha = 0
+        guard let source = overlayContainer?.overlayScene else {
+            /*
+             No source scene: transition to destination right away:
+             */
+            willTransition(to: scene)
+            scene.navigationDelegate = self
+            scene.alpha = 0
+            overlayContainer?.overlayScene = scene
+            scene.fadeAlpha(to: 1, duration: self.transitionDuration) { [weak self] in
+                completion()
+                self?.didTransition(to: scene)
+            }
+            return
+        }
 
         /*
-         [1] This block gets ultimately executed, regardless:
+         Fade source out...
          */
-        let fadeIntoNewScene: (() -> Void) = { [weak self] in
+        source.fadeAlpha(to: 0, duration: self.transitionDuration) { [weak self] in
             guard let this = self else {
-                return completion()
+                return
             }
-            this.overlayView?.overlayScene = scene
+            this.willTransition(to: scene)
+            scene.navigationDelegate = this
+            scene.alpha = 0
+            this.overlayContainer?.overlayScene = scene
+            /*
+             ...and then fade destination in:
+             */
             scene.fadeAlpha(to: 1, duration: this.transitionDuration) { [weak self] in
                 completion()
                 self?.didTransition(to: scene)
             }
-            scene.navigationDelegate = this
-        }
-
-        /*
-         [2A] Animate out of the current scene first, if present:
-         */
-        if let current = overlayView?.overlayScene {
-            current.fadeAlpha(to: 0, duration: self.transitionDuration) {
-                fadeIntoNewScene()
-            }
-        } else {
-            /*
-             [2B] No current scene; transition into the new one right away:
-             */
-            fadeIntoNewScene()
         }
     }
 }

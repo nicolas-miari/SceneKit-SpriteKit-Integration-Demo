@@ -18,11 +18,14 @@ class BaseOverlayScene: SKScene, OverlayScene {
 
     // (var alpha: CGFloat is automatically satisfied by SKScene)
 
-    // (func transition(to:completion:) has a default implementation delgating to `navigationDelegate`)
-
     var navigationDelegate: OverlayNavigationDelegate?
 
     func fadeAlpha(to newAlpha: CGFloat, duration: TimeInterval, completion: @escaping (() -> Void)) {
         run(.fadeAlpha(to: newAlpha, duration: duration), completion: completion)
+    }
+
+    func transition(to scene: OverlayScene, completion: @escaping (() -> Void) = {}) {
+        navigationDelegate?.transition(to: scene, completion: completion)
+        scene.navigationDelegate = navigationDelegate
     }
 }

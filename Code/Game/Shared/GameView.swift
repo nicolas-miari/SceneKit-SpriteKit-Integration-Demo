@@ -10,7 +10,7 @@ import SceneKit
 import SpriteKit
 import CoreGraphics
 
-class GameView: SCNView, OverlayView {
+class GameView: SCNView, OverlayScenePresenter {
 
     var overlayScene: OverlayScene? {
         set {
